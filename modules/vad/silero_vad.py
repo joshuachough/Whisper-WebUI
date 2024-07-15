@@ -51,8 +51,9 @@ class SileroVAD:
             vad_options=vad_parameters,
             progress=progress
         )
-        audio = self.collect_chunks(audio, speech_chunks)
-        duration_after_vad = audio.shape[0] / sampling_rate
+        # audio = self.collect_chunks(audio, speech_chunks)
+        # duration_after_vad = audio.shape[0] / sampling_rate
+        audio = [audio[chunk["start"]: chunk["end"]] for chunk in speech_chunks]
 
         return audio
 

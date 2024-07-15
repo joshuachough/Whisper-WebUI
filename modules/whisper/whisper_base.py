@@ -93,11 +93,13 @@ class WhisperBase(ABC):
                 min_silence_duration_ms=params.min_silence_duration_ms,
                 speech_pad_ms=params.speech_pad_ms
             )
+            print('VAD filtering..')
             audio = self.vad.run(
                 audio=audio,
                 vad_parameters=vad_options,
                 progress=progress
             )
+            print('Audio after VAD:', [len(a) for a in audio])
 
         if params.lang == "Automatic Detection":
             params.lang = None
@@ -105,11 +107,29 @@ class WhisperBase(ABC):
             language_code_dict = {value: key for key, value in whisper.tokenizer.LANGUAGES.items()}
             params.lang = language_code_dict[params.lang]
 
-        result, elapsed_time = self.transcribe(
-            audio,
-            progress,
-            *astuple(params)
-        )
+        if params.vad_filter:
+            result, elapsed_time = [], 0
+            for i, clip in enumerate(audio):
+                # progress(i/len(audio), desc="Transcribing VAD audio clips..")
+                r, t = self.transcribe(
+                    clip,
+                    progress,
+                    *astuple(params)
+                )
+                if len(result) > 0:
+                    last_time = result[-1]['end']
+                    for segment in r:
+                        segment['start'] += last_time
+                        segment['end'] += last_time
+                print(r)
+                result.extend(r)
+                elapsed_time += t
+        else:
+            result, elapsed_time = self.transcribe(
+                audio,
+                progress,
+                *astuple(params)
+            )
 
         if params.is_diarize:
             result, elapsed_time_diarization = self.diarizer.run(
@@ -119,6 +139,9 @@ class WhisperBase(ABC):
                 device=self.device
             )
             elapsed_time += elapsed_time_diarization
+
+        print(result)
+
         return result, elapsed_time
 
     def transcribe_file(self,
